@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="description" content="Serverless P2P LAN Secure Chat - Zero Internet Surveillance">
+    <title>P2P Secure Chat [LAN Only]</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230d1117' width='192' height='192'/%3E%3Ctext x='96' y='115' font-family='monospace' font-size='56' fill='%2300ff41' text-anchor='middle'%3EP2P%3C/text%3E%3C/svg%3E">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #00ff41;
+            --text-secondary: #8b949e;
+            --accent-cyan: #00d9ff;
+            --accent-red: #ff006e;
+            --accent-yellow: #ffb703;
+            --border-color: #30363d;
+            --shadow-glow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Monaco', 'Courier New', monospace;
+            line-height: 1.5;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 2px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: inset 0 -1px 0 var(--border-color);
+            position: relative;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-shadow: var(--shadow-glow);
+            letter-spacing: 2px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--text-secondary);
+            animation: pulse-dim 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background-color: var(--text-primary);
+            animation: pulse 1s infinite;
+        }
+
+        .status-indicator.connecting {
+            background-color: var(--accent-yellow);
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes pulse-dim {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.1; }
+        }
+
+        .status-text {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-left: 0.5rem;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .header-right button {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--accent-cyan);
+            padding: 0.4rem 0.8rem;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+        }
+
+        .header-right button:hover {
+            background-color: var(--accent-cyan);
+            color: var(--bg-primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Main Container */
+        .container {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            gap: 0.5rem;
+            padding: 0.5rem;
+        }
+
+        /* Chat Area */
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-primary);
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 2px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin-bottom: 0.8rem;
+            padding: 0.5rem 0.8rem;
+            border-left: 3px solid var(--accent-cyan);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .message.local {
+            border-left-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .message.remote {
+            border-left-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.2rem;
+        }
+
+        .message-content {
+            word-break: break-word;
+        }
+
+        /* Input Area */
+        .input-area {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        input[type="text"],
+        textarea {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--accent-cyan);
+            padding: 0.6rem;
+            border-radius: 2px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            box-shadow: var(--shadow-glow);
+            border-color: var(--text-primary);
+        }
+
+        #messageInput {
+            flex: 1;
+            resize: none;
+            max-height: 80px;
+        }
+
+        .send-btn {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--text-primary);
+            padding: 0.6rem 1.2rem;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+
+        .send-btn:hover {
+            background-color: var(--text-primary);
+            color: var(--bg-primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .send-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* File Share Section */
+        .file-section {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            padding: 1rem;
+            min-height: 0;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-yellow);
+            margin-bottom: 0.8rem;
+            border-bottom: 1px dotted var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .drop-zone {
+            flex: 1;
+            border: 2px dashed var(--accent-cyan);
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background-color: rgba(0, 217, 255, 0.05);
+            transition: all 0.2s ease;
+            text-align: center;
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: var(--text-primary);
+            background-color: rgba(0, 255, 65, 0.1);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .drop-zone-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            margin-bottom: 0.8rem;
+            border-radius: 2px;
+            background-color: var(--bg-primary);
+        }
+
+        .file-item {
+            font-size: 0.75rem;
+            padding: 0.5rem;
+            margin-bottom: 0.4rem;
+            background-color: var(--bg-secondary);
+            border-left: 2px solid var(--accent-cyan);
+            word-break: break-all;
+            border-radius: 2px;
+        }
+
+        .file-progress {
+            width: 100%;
+            height: 4px;
+            background-color: var(--bg-primary);
+            border-radius: 2px;
+            margin-top: 0.3rem;
+            overflow: hidden;
+        }
+
+        .file-progress-bar {
+            height: 100%;
+            background-color: var(--text-primary);
+            width: 0%;
+            transition: width 0.2s ease;
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Console Area */
+        .console-section {
+            height: 200px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            padding: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            margin-top: 0.5rem;
+        }
+
+        .console-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-red);
+            margin-bottom: 0.5rem;
+            border-bottom: 1px dotted var(--border-color);
+            padding-bottom: 0.3rem;
+        }
+
+        .console-output {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 0.75rem;
+            line-height: 1.3;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: var(--text-secondary);
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .console-line {
+            margin-bottom: 0.2rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .console-line.info {
+            color: var(--text-primary);
+        }
+
+        .console-line.warn {
+            color: var(--accent-yellow);
+        }
+
+        .console-line.error {
+            color: var(--accent-red);
+        }
+
+        .console-line.success {
+            color: var(--text-primary);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 2px;
+            padding: 1.5rem;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 0 40px rgba(0, 217, 255, 0.5);
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            text-shadow: var(--shadow-glow);
+        }
+
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+
+        .qr-container canvas {
+            max-width: 100%;
+        }
+
+        .copy-area {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 0.8rem;
+            margin: 0.8rem 0;
+            border-radius: 2px;
+        }
+
+        .copy-text {
+            font-size: 0.75rem;
+            word-break: break-all;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            justify-content: center;
+        }
+
+        .button-group button {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--accent-cyan);
+            padding: 0.6rem 1rem;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: 'Monaco', 'Courier New', monospace;
+            transition: all 0.2s ease;
+        }
+
+        .button-group button:hover {
+            background-color: var(--accent-cyan);
+            color: var(--bg-primary);
+        }
+
+        .camera-input-wrapper {
+            display: none;
+            margin: 1rem 0;
+        }
+
+        .camera-input-wrapper.active {
+            display: block;
+        }
+
+        video {
+            max-width: 100%;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background-color: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: var(--accent-cyan);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .file-section {
+                width: 100%;
+                height: 150px;
+            }
+
+            .console-section {
+                height: 150px;
+            }
+
+            .modal-content {
+                width: 95vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <div class="header-title">▶ P2P_SECURE_CHAT</div>
+            <div>
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span class="status-text" id="statusText">Offline</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <button onclick="openSignalingModal('offer')">█ INITIATE</button>
+            <button onclick="openSignalingModal('answer')">█ CONNECT</button>
+            <button onclick="installPWA()">█ INSTALL</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="chat-section">
+            <div class="chat-container" id="chatContainer"></div>
+            <div class="input-area">
+                <textarea id="messageInput" placeholder="[MESSAGE] >> " spellcheck="false"></textarea>
+                <button class="send-btn" onclick="sendMessage()">SEND</button>
+            </div>
+        </div>
+
+        <div class="file-section">
+            <div class="section-title">FILE TRANSFER</div>
+            <div class="drop-zone" id="dropZone" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" onclick="document.getElementById('fileInput').click()">
+                <div class="drop-zone-text">
+                    DROP FILES HERE<br>
+                    or<br>
+                    CLICK TO BROWSE<br>
+                    <br>
+                    <small>(Git bundles, archives, etc.)</small>
+                </div>
+            </div>
+            <input type="file" id="fileInput" multiple hidden onchange="handleFileSelect(event)">
+            <div class="file-list" id="fileList"></div>
+        </div>
+    </div>
+
+    <div class="console-section">
+        <div class="console-title">▶ SYSTEM_LOG</div>
+        <div class="console-output" id="consoleOutput"></div>
+    </div>
+
+    <!-- Signaling Modal -->
+    <div class="modal" id="signalingModal">
+        <div class="modal-content">
+            <div class="modal-title" id="modalTitle"></div>
+            
+            <div id="offerSection">
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    [1] QRコードをスキャンしてシグナリング情報を共有
+                </p>
+                <div class="qr-container" id="qrContainer"></div>
+                
+                <p style="color: var(--text-secondary); margin-top: 1rem; margin-bottom: 0.5rem;">
+                    [2] またはテキストコピー:
+                </p>
+                <div class="copy-area">
+                    <div class="copy-text" id="copyText"></div>
+                    <button style="width: 100%; padding: 0.5rem;" onclick="copyToClipboard()">COPY TO CLIPBOARD</button>
+                </div>
+
+                <p style="color: var(--text-secondary); margin-top: 1rem; margin-bottom: 0.5rem;">
+                    [3] 相手からのシグナリング情報を貼り付け:
+                </p>
+                <textarea id="answerInput" placeholder="Paste answer here..." style="width: 100%; min-height: 100px; margin-bottom: 0.8rem;"></textarea>
+            </div>
+
+            <div id="answerSection" style="display: none;">
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    QRコードをスキャンするか、テキストを貼り付けてください:
+                </p>
+
+                <div class="camera-input-wrapper" id="cameraWrapper">
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">
+                        📷 QRコード読み取り:
+                    </p>
+                    <video id="cameraStream" style="max-width: 100%; border: 1px solid var(--border-color);"></video>
+                </div>
+                <button onclick="toggleCamera()" style="width: 100%; margin-bottom: 0.8rem; padding: 0.6rem; background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--accent-cyan); cursor: pointer; border-radius: 2px;">TOGGLE CAMERA</button>
+
+                <textarea id="offerInput" placeholder="Paste offer here or scan QR..." style="width: 100%; min-height: 100px; margin-bottom: 0.8rem;"></textarea>
+            </div>
+
+            <div class="button-group">
+                <button onclick="proceedSignaling()">CONNECT</button>
+                <button onclick="closeSignalingModal()" style="border-color: var(--accent-red); color: var(--accent-red);">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // UTILITY: Console Logger
+        // ============================================
+        const ConsoleLogger = {
+            output: document.getElementById('consoleOutput'),
+            log(message, type = 'info') {
+                const line = document.createElement('div');
+                line.className = `console-line ${type}`;
+                const timestamp = new Date().toLocaleTimeString();
+                line.textContent = `[${timestamp}] ${message}`;
+                this.output.appendChild(line);
+                this.output.scrollTop = this.output.scrollHeight;
+            },
+            info(msg) { this.log(msg, 'info'); },
+            warn(msg) { this.log(msg, 'warn'); },
+            error(msg) { this.log(msg, 'error'); },
+            success(msg) { this.log(msg, 'success'); },
+        };
+
+        // ============================================
+        // CORE: WebRTC P2P Setup
+        // ============================================
+        let peerConnection = null;
+        let dataChannel = null;
+        let fileDataChannel = null;
+        let iceCandidates = [];
+        let signalingMode = null; // 'offer' or 'answer'
+
+        function updateStatusIndicator(status) {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            indicator.className = 'status-indicator ' + status;
+            if (status === 'connected') {
+                text.textContent = '✓ Connected';
+            } else if (status === 'connecting') {
+                text.textContent = '⧗ Connecting';
+            } else {
+                text.textContent = 'Offline';
+            }
+        }
+
+        function initializePeerConnection() {
+            ConsoleLogger.info('Initializing WebRTC PeerConnection...');
+            
+            peerConnection = new RTCPeerConnection({
+                iceServers: [] // No STUN/TURN servers - LAN only
+            });
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    iceCandidates.push(event.candidate);
+                    ConsoleLogger.info(`ICE candidate gathered (${iceCandidates.length})`);
+                } else {
+                    ConsoleLogger.success('All ICE candidates gathered');
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                const state = peerConnection.connectionState;
+                ConsoleLogger.info(`Connection state: ${state}`);
+                
+                if (state === 'connected') {
+                    updateStatusIndicator('connected');
+                    ConsoleLogger.success('WebRTC connection established!');
+                } else if (state === 'connecting') {
+                    updateStatusIndicator('connecting');
+                } else if (state === 'failed' || state === 'disconnected') {
+                    updateStatusIndicator('offline');
+                }
+            };
+
+            peerConnection.ondatachannel = (event) => {
+                console.log('Data channel received:', event.channel.label);
+                if (event.channel.label === 'chat') {
+                    setupDataChannel(event.channel);
+                } else if (event.channel.label === 'files') {
+                    setupFileChannel(event.channel);
+                }
+            };
+
+            return peerConnection;
+        }
+
+        function setupDataChannel(channel) {
+            dataChannel = channel;
+            dataChannel.onopen = () => {
+                ConsoleLogger.success('Data channel OPEN (chat)');
+            };
+            dataChannel.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    addMessageToChat(msg.text, 'remote', msg.timestamp);
+                } catch (e) {
+                    ConsoleLogger.error('Failed to parse message: ' + e.message);
+                }
+            };
+            dataChannel.onerror = (error) => {
+                ConsoleLogger.error('Data channel error: ' + error.message);
+            };
+        }
+
+        function setupFileChannel(channel) {
+            fileDataChannel = channel;
+            fileDataChannel.bufferedAmountLowThreshold = 65536;
+            
+            fileDataChannel.onopen = () => {
+                ConsoleLogger.success('Data channel OPEN (files)');
+            };
+            fileDataChannel.onmessage = (event) => {
+                handleIncomingFileData(event.data);
+            };
+            fileDataChannel.onerror = (error) => {
+                ConsoleLogger.error('File channel error: ' + error.message);
+            };
+        }
+
+        // ============================================
+        // SIGNALING: Manual via Text/QR
+        // ============================================
+        function openSignalingModal(mode) {
+            signalingMode = mode;
+            const modal = document.getElementById('signalingModal');
+            const title = document.getElementById('modalTitle');
+            const offerSection = document.getElementById('offerSection');
+            const answerSection = document.getElementById('answerSection');
+
+            if (mode === 'offer') {
+                title.textContent = '█ INITIATE CONNECTION (Offer)';
+                offerSection.style.display = 'block';
+                answerSection.style.display = 'none';
+                generateOffer();
+            } else {
+                title.textContent = '█ RESPOND TO CONNECTION (Answer)';
+                offerSection.style.display = 'none';
+                answerSection.style.display = 'block';
+            }
+
+            modal.classList.add('active');
+            updateStatusIndicator('connecting');
+        }
+
+        function closeSignalingModal() {
+            const modal = document.getElementById('signalingModal');
+            modal.classList.remove('active');
+            updateStatusIndicator('offline');
+        }
+
+        async function generateOffer() {
+            initializePeerConnection();
+
+            // Create data channels
+            dataChannel = peerConnection.createDataChannel('chat', { ordered: true });
+            setupDataChannel(dataChannel);
+
+            fileDataChannel = peerConnection.createDataChannel('files', { ordered: false, maxRetransmits: 3 });
+            setupFileChannel(fileDataChannel);
+
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                ConsoleLogger.info('Offer created, waiting for answer...');
+                
+                // Wait for ICE candidates
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (!peerConnection || peerConnection.iceGatheringState === 'complete') {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                });
+
+                const signalingData = {
+                    type: 'offer',
+                    sdp: peerConnection.localDescription.sdp,
+                    iceCandidates: iceCandidates.map(c => c.candidate)
+                };
+
+                const encoded = btoa(JSON.stringify(signalingData));
+                displaySignalingData(encoded);
+            } catch (error) {
+                ConsoleLogger.error('Offer generation failed: ' + error.message);
+            }
+        }
+
+        async function generateAnswer(offerData) {
+            initializePeerConnection();
+
+            // Create data channels (receiver doesn't create them, receives them via ondatachannel)
+            
+            try {
+                const offer = new RTCSessionDescription({
+                    type: 'offer',
+                    sdp: offerData.sdp
+                });
+
+                await peerConnection.setRemoteDescription(offer);
+
+                // Add ICE candidates
+                for (const candidate of offerData.iceCandidates) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate({ candidate }));
+                    } catch (e) {
+                        // Some candidates might fail, continue
+                    }
+                }
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                ConsoleLogger.info('Answer created...');
+
+                // Wait for ICE candidates
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (!peerConnection || peerConnection.iceGatheringState === 'complete') {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                });
+
+                const signalingData = {
+                    type: 'answer',
+                    sdp: peerConnection.localDescription.sdp,
+                    iceCandidates: iceCandidates.map(c => c.candidate)
+                };
+
+                const encoded = btoa(JSON.stringify(signalingData));
+                displaySignalingData(encoded);
+            } catch (error) {
+                ConsoleLogger.error('Answer generation failed: ' + error.message);
+            }
+        }
+
+        function displaySignalingData(encoded) {
+            // Generate QR Code
+            generateQRCode(encoded);
+            
+            // Display text
+            document.getElementById('copyText').textContent = encoded;
+        }
+
+        function proceedSignaling() {
+            if (signalingMode === 'offer') {
+                handleAnswerResponse();
+            } else {
+                handleOfferInput();
+            }
+        }
+
+        async function handleAnswerResponse() {
+            const answerText = document.getElementById('answerInput').value.trim();
+            if (!answerText) {
+                alert('Please paste the answer from the peer');
+                return;
+            }
+
+            try {
+                const answerData = JSON.parse(atob(answerText));
+                
+                if (answerData.type !== 'answer') {
+                    throw new Error('Invalid answer data');
+                }
+
+                const answer = new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerData.sdp
+                });
+
+                await peerConnection.setRemoteDescription(answer);
+
+                for (const candidate of answerData.iceCandidates) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate({ candidate }));
+                    } catch (e) {
+                        // Continue
+                    }
+                }
+
+                ConsoleLogger.success('Answer received and processed!');
+                closeSignalingModal();
+            } catch (error) {
+                ConsoleLogger.error('Error processing answer: ' + error.message);
+                alert('Error: Invalid answer format');
+            }
+        }
+
+        async function handleOfferInput() {
+            const offerText = document.getElementById('offerInput').value.trim();
+            if (!offerText) {
+                alert('Please paste the offer or scan QR code');
+                return;
+            }
+
+            try {
+                const offerData = JSON.parse(atob(offerText));
+                
+                if (offerData.type !== 'offer') {
+                    throw new Error('Invalid offer data');
+                }
+
+                await generateAnswer(offerData);
+                ConsoleLogger.success('Signaling complete! Answer ready.');
+            } catch (error) {
+                ConsoleLogger.error('Error processing offer: ' + error.message);
+                alert('Error: Invalid offer format');
+            }
+        }
+
+        // ============================================
+        // QR CODE GENERATION
+        // ============================================
+        function generateQRCode(text) {
+            // Simple QR code generation using Canvas
+            // Using a basic implementation without external library
+            const container = document.getElementById('qrContainer');
+            container.innerHTML = '';
+
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            const size = 300;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Draw simple QR-like pattern (placeholder visual)
+            // For production, use a proper QR library
+            // This is a visual placeholder that demonstrates the concept
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+
+            // Draw border
+            ctx.fillStyle = '#000000';
+            for (let i = 0; i < 7; i++) {
+                ctx.fillRect(i, i, size - 2*i, 1);
+                ctx.fillRect(i, i, 1, size - 2*i);
+                ctx.fillRect(size - 1 - i, i, 1, size - 2*i);
+                ctx.fillRect(i, size - 1 - i, size - 2*i, 1);
+            }
+
+            // Simple pseudo-QR pattern based on text hash
+            const hash = text.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+            ctx.fillStyle = '#000000';
+            const cellSize = size / 32;
+            for (let i = 0; i < 32; i++) {
+                for (let j = 0; j < 32; j++) {
+                    if ((hash ^ (i * 32 + j)) & 0xFF) {
+                        ctx.fillRect(i * cellSize, j * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+
+            container.appendChild(canvas);
+        }
+
+        let cameraActive = false;
+        async function toggleCamera() {
+            const wrapper = document.getElementById('cameraWrapper');
+            const video = document.getElementById('cameraStream');
+
+            if (!cameraActive) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    video.srcObject = stream;
+                    wrapper.classList.add('active');
+                    cameraActive = true;
+                    ConsoleLogger.info('Camera activated');
+                    
+                    // Start QR scanning
+                    startQRScanning(video);
+                } catch (error) {
+                    ConsoleLogger.error('Camera access denied: ' + error.message);
+                }
+            } else {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                wrapper.classList.remove('active');
+                cameraActive = false;
+                ConsoleLogger.info('Camera deactivated');
+            }
+        }
+
+        function startQRScanning(video) {
+            // Placeholder for QR scanning
+            // In production, integrate a QR library like jsQR
+            ConsoleLogger.info('QR scanning initiated (placeholder)');
+        }
+
+        function copyToClipboard() {
+            const text = document.getElementById('copyText').textContent;
+            if (!text) return;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                ConsoleLogger.success('Copied to clipboard!');
+            }).catch(() => {
+                alert('Failed to copy');
+            });
+        }
+
+        // ============================================
+        // CHAT FUNCTIONALITY
+        // ============================================
+        function addMessageToChat(text, type, timestamp) {
+            const container = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date(timestamp).toLocaleTimeString();
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = text;
+
+            messageDiv.appendChild(timeDiv);
+            messageDiv.appendChild(contentDiv);
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+
+            if (!text) return;
+            if (!dataChannel || dataChannel.readyState !== 'open') {
+                ConsoleLogger.warn('Data channel not ready');
+                return;
+            }
+
+            const msg = {
+                text: text,
+                timestamp: Date.now()
+            };
+
+            try {
+                dataChannel.send(JSON.stringify(msg));
+                addMessageToChat(text, 'local', Date.now());
+                input.value = '';
+                ConsoleLogger.info(`Message sent: ${text.substring(0, 50)}...`);
+            } catch (error) {
+                ConsoleLogger.error('Send failed: ' + error.message);
+            }
+        }
+
+        // ============================================
+        // FILE TRANSFER FUNCTIONALITY
+        // ============================================
+        const CHUNK_SIZE = 16384; // 16KB chunks
+        let fileQueue = [];
+        let currentFileTransfer = null;
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            document.getElementById('dropZone').classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            document.getElementById('dropZone').classList.remove('dragover');
+        }
+
+        function handleFileDrop(event) {
+            event.preventDefault();
+            document.getElementById('dropZone').classList.remove('dragover');
+            handleFileSelect({ target: { files: event.dataTransfer.files } });
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (!files.length) return;
+
+            for (let file of files) {
+                if (fileDataChannel && fileDataChannel.readyState === 'open') {
+                    queueFileForTransfer(file);
+                } else {
+                    ConsoleLogger.warn('File channel not ready');
+                }
+            }
+        }
+
+        async function queueFileForTransfer(file) {
+            ConsoleLogger.info(`Queuing file: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+
+            const fileId = Math.random().toString(36).substring(2, 11);
+            const fileItem = {
+                id: fileId,
+                name: file.name,
+                size: file.size,
+                sent: 0
+            };
+
+            fileQueue.push({ file, fileId });
+
+            const fileListDiv = document.getElementById('fileList');
+            const itemDiv = document.createElement('div');
+            itemDiv.id = `file-${fileId}`;
+            itemDiv.className = 'file-item';
+            itemDiv.innerHTML = `
+                <div>${file.name}</div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">${(file.size / 1024).toFixed(2)} KB</div>
+                <div class="file-progress">
+                    <div class="file-progress-bar" id="progress-${fileId}"></div>
+                </div>
+            `;
+            fileListDiv.appendChild(itemDiv);
+
+            if (!currentFileTransfer) {
+                transferNextFile();
+            }
+        }
+
+        async function transferNextFile() {
+            if (!fileQueue.length || !fileDataChannel || fileDataChannel.readyState !== 'open') {
+                return;
+            }
+
+            const { file, fileId } = fileQueue.shift();
+            currentFileTransfer = { fileId, sent: 0, total: file.size };
+
+            // Send file metadata
+            const metadata = {
+                type: 'file-start',
+                fileId: fileId,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type
+            };
+
+            fileDataChannel.send(JSON.stringify(metadata));
+            ConsoleLogger.info(`Starting transfer: ${file.name}`);
+
+            // Send file chunks
+            const reader = new FileReader();
+            let offset = 0;
+
+            reader.onload = (event) => {
+                const chunk = event.target.result;
+                const chunkMessage = {
+                    type: 'file-chunk',
+                    fileId: fileId,
+                    offset: offset,
+                    data: btoa(String.fromCharCode.apply(null, new Uint8Array(chunk)))
+                };
+
+                fileDataChannel.send(JSON.stringify(chunkMessage));
+                offset += chunk.byteLength;
+                currentFileTransfer.sent = offset;
+
+                const progress = (offset / file.size) * 100;
+                const progressBar = document.getElementById(`progress-${fileId}`);
+                if (progressBar) progressBar.style.width = progress + '%';
+
+                if (offset < file.size) {
+                    const nextChunk = file.slice(offset, offset + CHUNK_SIZE);
+                    reader.readAsArrayBuffer(nextChunk);
+                } else {
+                    const endMessage = {
+                        type: 'file-end',
+                        fileId: fileId
+                    };
+                    fileDataChannel.send(JSON.stringify(endMessage));
+                    ConsoleLogger.success(`Transfer complete: ${file.name}`);
+                    currentFileTransfer = null;
+                    transferNextFile();
+                }
+            };
+
+            const firstChunk = file.slice(0, CHUNK_SIZE);
+            reader.readAsArrayBuffer(firstChunk);
+        }
+
+        const receivedFiles = {};
+
+        function handleIncomingFileData(data) {
+            try {
+                const message = JSON.parse(data);
+
+                if (message.type === 'file-start') {
+                    const fileId = message.fileId;
+                    receivedFiles[fileId] = {
+                        name: message.fileName,
+                        size: message.fileSize,
+                        chunks: [],
+                        received: 0
+                    };
+                    ConsoleLogger.info(`Receiving: ${message.fileName}`);
+
+                    const fileListDiv = document.getElementById('fileList');
+                    const itemDiv = document.createElement('div');
+                    itemDiv.id = `recv-${fileId}`;
+                    itemDiv.className = 'file-item';
+                    itemDiv.innerHTML = `
+                        <div>↓ ${message.fileName}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary);">${(message.fileSize / 1024).toFixed(2)} KB</div>
+                        <div class="file-progress">
+                            <div class="file-progress-bar" id="recv-progress-${fileId}"></div>
+                        </div>
+                    `;
+                    fileListDiv.appendChild(itemDiv);
+
+                } else if (message.type === 'file-chunk') {
+                    const fileId = message.fileId;
+                    if (!receivedFiles[fileId]) return;
+
+                    const chunk = Uint8Array.from(atob(message.data), c => c.charCodeAt(0));
+                    receivedFiles[fileId].chunks.push(chunk);
+                    receivedFiles[fileId].received += chunk.byteLength;
+
+                    const progress = (receivedFiles[fileId].received / receivedFiles[fileId].size) * 100;
+                    const progressBar = document.getElementById(`recv-progress-${fileId}`);
+                    if (progressBar) progressBar.style.width = progress + '%';
+
+                } else if (message.type === 'file-end') {
+                    const fileId = message.fileId;
+                    const fileData = receivedFiles[fileId];
+                    if (!fileData) return;
+
+                    // Combine chunks
+                    const blob = new Blob(fileData.chunks, { type: 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileData.name;
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    ConsoleLogger.success(`Received: ${fileData.name}`);
+                    delete receivedFiles[fileId];
+                }
+            } catch (error) {
+                ConsoleLogger.error('File data error: ' + error.message);
+            }
+        }
+
+        // ============================================
+        // PWA FUNCTIONALITY
+        // ============================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js', { scope: './' })
+                    .then((registration) => {
+                        ConsoleLogger.success('Service Worker registered: ' + registration.scope);
+
+                        // Detect updates to sw.js and notify
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            ConsoleLogger.info('New Service Worker version detected, installing...');
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'activated') {
+                                    ConsoleLogger.success('Service Worker updated & activated');
+                                }
+                            });
+                        });
+                    })
+                    .catch((err) => {
+                        ConsoleLogger.warn('SW registration failed: ' + err.message);
+                    });
+            });
+
+            // React to controller changes (new SW took over)
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                ConsoleLogger.info('Service Worker controller changed');
+            });
+        } else {
+            ConsoleLogger.warn('Service Worker not supported in this browser');
+        }
+
+        function installPWA() {
+            if (window.deferredPrompt) {
+                window.deferredPrompt.prompt();
+                window.deferredPrompt.userChoice.then(choiceResult => {
+                    if (choiceResult.outcome === 'accepted') {
+                        ConsoleLogger.success('PWA installed!');
+                    }
+                    window.deferredPrompt = null;
+                });
+            } else {
+                alert('PWA installation not available on this device');
+            }
+        }
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        // ============================================
+        // INIT
+        // ============================================
+        document.getElementById('messageInput').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        ConsoleLogger.success('P2P Secure Chat initialized');
+        ConsoleLogger.info('LAN-only mode. No external servers.');
+        ConsoleLogger.warn('Waiting for peer connection...');
+    </script>
+</body>
+</html>
